@@ -1,0 +1,211 @@
+{
+  "stages": [
+    {
+      "name": "データ層（モデルと状態管理）",
+      "tasks": [
+        {
+          "id": "1.1",
+          "name": "テーブルデータモデルの実装",
+          "description": "Cellと`Sheet`の型定義、値の設定・取得",
+          "tests": [
+            "セル値の設定・取得（正常系）",
+            "範囲外エラー（異常系）"
+          ],
+          "status": "completed",
+          "directory": "src/models/table"
+        },
+        {
+          "id": "1.2",
+          "name": "UMLエディタ状態モデルの実装",
+          "description": "UmlEditorState型定義、モード切替、DSL更新",
+          "tests": [
+            "モード切替とDSL更新（正常系）",
+            "不正モードエラー（異常系）"
+          ],
+          "status": "completed",
+          "directory": "src/models/uml"
+        },
+        {
+          "id": "1.3",
+          "name": "アプリ全体の状態管理",
+          "description": "AppState型とSvelte storeのセットアップ",
+          "tests": [
+            "テーブル、UML、分割比率の更新（正常系）",
+            "範囲外比率エラー（異常系）"
+          ],
+          "status": "completed",
+          "directory": "src/models/state"
+        },
+        {
+          "id": "1.4",
+          "name": "YAML保存ロジック",
+          "description": "AppStateをトリミングしてYAMLに変換、ダウンロード",
+          "tests": [
+            "データのYAML化（正常系）",
+            "空データ出力（異常系）"
+          ],
+          "status": "completed",
+          "directory": "src/models/yaml"
+        },
+        {
+          "id": "1.5",
+          "name": "YAML読み込みロジック",
+          "description": "YAMLをパースしてAppStateに反映",
+          "tests": [
+            "YAML復元（正常系）",
+            "不正YAMLでエラー（異常系）"
+          ],
+          "status": "completed",
+          "directory": "src/models/yaml"
+        }
+      ]
+    },
+    {
+      "name": "ロジック層（コンポーネントロジック）",
+      "tasks": [
+        {
+          "id": "2.1",
+          "name": "テーブル編集ロジック",
+          "description": "20×20グリッドのセル編集ロジック",
+          "tests": [
+            "セル入力反映（正常系）",
+            "範囲外無反応（異常系）"
+          ],
+          "status": "completed",
+          "directory": "src/logic/table"
+        },
+        {
+          "id": "2.2",
+          "name": "UMLエディタロジック",
+          "description": "DSL入力とモード切替ロジック",
+          "tests": [
+            "DSL反映とモード切替（正常系）",
+            "不正DSLエラー（異常系）"
+          ],
+          "status": "completed",
+          "directory": "src/logic/uml"
+        },
+        {
+          "id": "2.3",
+          "name": "UMLビューワー描画ロジック",
+          "description": "DSLをMermaid.jsでリアルタイム描画（1秒debounce）",
+          "tests": [
+            "1秒後の描画更新（正常系）",
+            "不正DSLエラー（異常系）"
+          ],
+          "status": "completed",
+          "directory": "src/logic/uml"
+        },
+        {
+          "id": "2.4",
+          "name": "分割スライダーロジック",
+          "description": "スライダーで分割比率（1〜99）を更新",
+          "tests": [
+            "比率更新（正常系）",
+            "範囲外無視（異常系）"
+          ],
+          "status": "completed",
+          "directory": "src/logic/split"
+        },
+        {
+          "id": "2.5",
+          "name": "ヘルプ表示ロジック",
+          "description": "ヘルプボタンでオーバーレイとサンプル表示",
+          "tests": [
+            "オーバーレイ表示と閉じる（正常系）",
+            "サンプル編集不可（異常系）"
+          ],
+          "status": "completed",
+          "directory": "src/logic/help"
+        }
+      ]
+    },
+    {
+      "name": "UI層（コンポーネントと統合）",
+      "tasks": [
+        {
+          "id": "3.1",
+          "name": "テーブルエリアUI",
+          "description": "20×20グリッドのUIコンポーネント",
+          "tests": [
+            "セル入力表示と更新（正常系）",
+            "範囲外無反応（異常系）"
+          ],
+          "status": "completed",
+          "directory": "src/components/table"
+        },
+        {
+          "id": "3.2",
+          "name": "UMLエリアUI",
+          "description": "エディターとビューワーの左右分割、三角ボタンでモード切替",
+          "tests": [
+            "DSL入力・描画同期とモード切替（正常系）",
+            "不正DSLエラー（異常系）"
+          ],
+          "status": "completed",
+          "directory": "src/components/uml"
+        },
+        {
+          "id": "3.3",
+          "name": "分割スライダーUI",
+          "description": "スライダーUIとエリア分割の動的調整",
+          "tests": [
+            "比率変化（正常系）",
+            "極端値で崩れなし（異常系）"
+          ],
+          "status": "completed",
+          "directory": "src/components/split"
+        },
+        {
+          "id": "3.4",
+          "name": "右上ボタンUI",
+          "description": "「保存」と「ヘルプ（〇に?）」ボタン",
+          "tests": [
+            "保存ダウンロードとヘルプ表示（正常系）",
+            "データなしエラー（異常系）"
+          ],
+          "status": "completed",
+          "directory": "src/components/buttons"
+        },
+        {
+          "id": "3.5",
+          "name": "全体レイアウト統合",
+          "description": "全エリアとボタンを統合",
+          "tests": [
+            "エリア配置と操作連携（正常系）",
+            "リサイズで崩れなし（異常系）"
+          ],
+          "status": "completed",
+          "directory": "src/components/layout"
+        }
+      ]
+    },
+    {
+      "name": "ビルドと検証",
+      "tasks": [
+        {
+          "id": "4.1",
+          "name": "SvelteKit静的ビルド設定",
+          "description": "静的出力設定とビルド確認",
+          "tests": [
+            "静的ファイルで全機能動作（正常系）",
+            "ライブラリエラーなし（異常系）"
+          ],
+          "status": "completed",
+          "directory": "src"
+        },
+        {
+          "id": "4.2",
+          "name": "統合テスト",
+          "description": "モックを外し、実際のAPIで動作確認",
+          "tests": [
+            "編集・描画・保存の連携（正常系）",
+            "不正入力エラー（異常系）"
+          ],
+          "status": "completed",
+          "directory": "src/tests"
+        }
+      ]
+    }
+  ]
+} 
