@@ -23,12 +23,20 @@ test.describe('統合テスト', () => {
     const umlViewer = page.locator('.viewer svg');
     await expect(umlViewer).toBeVisible({ timeout: 2000 });
 
-    // スライダーで分割比率を変更
-    const slider = page.locator('input[type="range"]');
-    await slider.evaluate((el: HTMLInputElement) => {
-      el.value = '30';
-      el.dispatchEvent(new Event('input'));
-    });
+    // スプリッターで分割比率を変更
+    const splitter = page.locator('.splitter');
+    const splitterContainer = page.locator('.splitter-container');
+    const containerBounds = await splitterContainer.boundingBox();
+    if (!containerBounds) throw new Error('スプリッターコンテナが見つかりません');
+
+    // スプリッターを30%の位置にドラッグ
+    await splitter.hover();
+    await page.mouse.down();
+    await page.mouse.move(
+      containerBounds.x + (containerBounds.width * 0.3),
+      containerBounds.y + (containerBounds.height / 2)
+    );
+    await page.mouse.up();
 
     // 保存ボタンをクリック
     const saveButton = page.locator('button.save');

@@ -5,7 +5,7 @@ import { UmlEditor } from '../../logic/uml/editor';
 
 // 初期状態の作成
 const initialState: AppState = {
-  テーブル: TableEditor.createInitialSheet(),
+  テーブル: TableEditor.createEmptySheet(),
   uml: UmlEditor.createInitialState(),
   splitRatio: 50
 };

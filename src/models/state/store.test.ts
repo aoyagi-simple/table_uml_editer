@@ -9,7 +9,7 @@ describe('AppState Store', () => {
   beforeEach(() => {
     // ストアを初期状態にリセット
     tableStore.set({
-      テーブル: TableEditor.createInitialSheet(),
+      テーブル: TableEditor.createEmptySheet(),
       uml: UmlEditor.createInitialState(),
       splitRatio: 50
     });

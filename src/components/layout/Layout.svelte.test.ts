@@ -17,16 +17,40 @@ describe('Layout', () => {
     it('エリア配置と操作連携が正しく動作すること', async () => {
       const { container } = render(Layout);
       
+      const splitter = container.querySelector('.splitter') as HTMLDivElement;
+      const splitterContainer = container.querySelector('.splitter-container') as HTMLDivElement;
       // 各エリアが存在することを確認
       expect(container.querySelector('.table-area')).toBeTruthy();
       expect(container.querySelector('.uml-area')).toBeTruthy();
-      expect(container.querySelector('.slider-container')).toBeTruthy();
+      expect(container.querySelector('.splitter-container')).toBeTruthy();
       expect(container.querySelector('.buttons')).toBeTruthy();
 
       // スライダーの操作で分割比率が変更されることを確認
-      const slider = container.querySelector('input[type="range"]') as HTMLInputElement;
-      await fireEvent.input(slider, { target: { value: '30' } });
+      
+      Object.defineProperty(splitterContainer, 'getBoundingClientRect', {
+        value: () => ({
+          left: 0,
+          width: 1000,
+          // その他の必要なプロパティ
+          right: 1000,
+          top: 0,
+          bottom: 500,
+          height: 500,
+          x: 0,
+          y: 0,
+          toJSON: () => {}
+        })
+      });
+
+      // マウスダウンイベントを発火
+      await fireEvent.mouseDown(splitter);
+      
+      // マウスムーブで30%の位置に移動
+      await fireEvent.mouseMove(window, { clientX: 300 });
       expect(get(tableStore).splitRatio).toBe(30);
+      // const slider = container.querySelector('input[type="range"]') as HTMLInputElement;
+      // await fireEvent.input(slider, { target: { value: '30' } });
+      // expect(get(tableStore).splitRatio).toBe(30);
 
       // コンテンツのスタイルが更新されることを確認
       const content = container.querySelector('.content') as HTMLElement;
