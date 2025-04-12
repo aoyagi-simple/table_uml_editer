@@ -105,7 +105,7 @@
     right: 16px;
     display: flex;
     gap: 8px;
-    z-index: 100;
+    z-index: 1001;
   }
 
   button {
@@ -142,13 +142,27 @@
     background: #ddd;
   }
 
+  /* ヘルプ表示中は戻るボタンのスタイルを変更 */
+  .help[aria-expanded="true"] {
+    width: auto;
+    padding: 0 16px;
+    border-radius: 4px;
+    background: #4a90e2;
+    color: white;
+    font-size: 14px;
+  }
+
+  .help[aria-expanded="true"]:hover {
+    background: #357abd;
+  }
+
   .overlay {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.7);
     display: flex;
     align-items: center;
     justify-content: center;
