@@ -16,10 +16,11 @@
 </script>
 
 <div class="uml-area">
-	<button class="mode-toggle" on:click={toggleMode}>
-		{$tableStore.uml.mode === 'editor-viewer' ? '▶' : '◀'}
-	</button>
 	<div class="content" class:viewer-only={$tableStore.uml.mode === 'viewer-only'}>
+    <button class="mode-toggle" on:click={toggleMode}>
+      {$tableStore.uml.mode === 'editor-viewer' ? '▶' : '◀'}
+    </button>
+    <div></div>
 		{#if $tableStore.uml.mode === 'editor-viewer'}
 			<div class="editor-container">
 				<UmlEditor />
@@ -38,9 +39,6 @@
 	}
 
 	.mode-toggle {
-		position: absolute;
-		top: 8px;
-		left: 8px;
 		z-index: 1;
 		width: 24px;
 		height: 24px;
@@ -52,7 +50,7 @@
 		align-items: center;
 		justify-content: center;
 		font-size: 12px;
-		/* box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); */
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 	}
 
 	.mode-toggle:hover {
@@ -62,6 +60,7 @@
 	.content {
 		height: 100%;
 		display: grid;
+    grid-template-rows: min-content;
 		grid-template-columns: 1fr 1fr;
 		gap: 8px;
 	}
