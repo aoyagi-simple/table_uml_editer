@@ -42,14 +42,15 @@ describe('動的追加UI機能のテスト', () => {
       expect(expandedSheet[0].length).toBe(testSheet[0].length);
     });
 
-    it('最終行・列にデータがない場合は拡張されない', () => {
-      const expandedSheet = TableEditor.expandIfNeeded(testSheet, { 
-        isLastRowVisible: true, 
-        isLastColumnVisible: true 
+    it('最終行・列にデータがない場合でも拡張される', () => {
+      const testSheet = TableEditor.createEmptySheet();
+      const expandedSheet = TableEditor.expandIfNeeded(testSheet, {
+        isLastRowVisible: true,
+        isLastColumnVisible: true
       });
-      
-      expect(expandedSheet.length).toBe(testSheet.length);
-      expect(expandedSheet[0].length).toBe(testSheet[0].length);
+
+      expect(expandedSheet.length).toBe(testSheet.length + 1);
+      expect(expandedSheet[0].length).toBe(testSheet[0].length + 1);
     });
   });
 

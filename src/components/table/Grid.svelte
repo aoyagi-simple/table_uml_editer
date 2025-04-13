@@ -1,5 +1,5 @@
 <!--
-  20×20のグリッドテーブルコンポーネント
+  グリッドテーブルコンポーネント
   - セルの入力と表示
   - 範囲外のセルは無効
   - リサイズハンドルの追加
@@ -13,7 +13,6 @@
   import GridResizer from './GridResizer.svelte';
   import { fade } from 'svelte/transition';
 
-  let gridSize = 0;
   let observer: IntersectionObserver;
   let isLastRowVisible = false;
   let isLastColVisible = false;
@@ -21,12 +20,7 @@
   let expandTimeout: NodeJS.Timeout | undefined;
 
   // 行と列のインデックス配列を動的に生成
-  $: {
-    const currentSheet = $tableStore.テーブル;
-    gridSize = Math.max(currentSheet.length, currentSheet[0]?.length || 0);
-  }
-
-  $: indices = Array.from({ length: gridSize }, (_, i) => i);
+  $: indices = Array.from({ length: Math.max($tableStore.テーブル.length, $tableStore.テーブル[0]?.length || 0) }, (_, i) => i);
 
   let editingCell: { row: number; col: number } | null = null;
   let editingValue = '';
@@ -51,21 +45,26 @@
     observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         const target = entry.target as HTMLElement;
-        if (target.dataset.lastRow !== undefined) {
+        const isLastRow = target.dataset.lastRow !== undefined;
+        const isLastCol = target.dataset.lastCol !== undefined;
+
+        if (isLastRow) {
           isLastRowVisible = entry.isIntersecting;
         }
-        if (target.dataset.lastCol !== undefined) {
+        if (isLastCol) {
           isLastColVisible = entry.isIntersecting;
         }
 
         // 可視性が変更された時に拡張チェックを実行
-        clearTimeout(expandCheckTimeout);
-        expandCheckTimeout = setTimeout(checkAndExpandGrid, 100);
+        if ((isLastRow || isLastCol) && entry.isIntersecting) {
+          clearTimeout(expandCheckTimeout);
+          expandCheckTimeout = setTimeout(checkAndExpandGrid, 100);
+        }
       });
     }, {
       root: null,
       rootMargin: '20px',
-      threshold: 0.1
+      threshold: [0, 0.1, 1.0]
     });
   }
 
@@ -74,11 +73,8 @@
     const lastRowIndex = currentSheet.length - 1;
     const lastColIndex = currentSheet[0].length - 1;
 
-    // 最終行・列のデータ存在チェック
-    const lastRowHasData = currentSheet[lastRowIndex]?.some(cell => cell.value.trim() !== '');
-    const lastColHasData = currentSheet.some(row => row[lastColIndex]?.value.trim() !== '');
-
-    if ((isLastRowVisible && lastRowHasData) || (isLastColVisible && lastColHasData)) {
+    // 最終行または最終列が表示されている場合のみ拡張
+    if (isLastRowVisible || isLastColVisible) {
       isExpanding = true;
       const expandedSheet = TableEditor.expandIfNeeded(currentSheet, {
         isLastRowVisible,
@@ -86,27 +82,31 @@
       });
       
       if (expandedSheet.length > currentSheet.length || expandedSheet[0].length > currentSheet[0].length) {
+        // アニメーション用のクラスを設定
+        expandedSheet.forEach((row, rowIndex) => {
+          row.forEach((cell, colIndex) => {
+            if (rowIndex === expandedSheet.length - 1 || colIndex === expandedSheet[0].length - 1) {
+              cell.isAnimating = true;
+            }
+          });
+        });
+
         tableStore.update(state => ({
           ...state,
           テーブル: expandedSheet
         }));
-        
-        // グリッドサイズを更新
-        gridSize = Math.max(expandedSheet.length, expandedSheet[0].length);
 
         // アニメーション状態をリセット
-        setTimeout(() => {
-          const updatedSheet = expandedSheet.map(row => 
-            row.map(cell => ({ ...cell, isAnimating: false }))
-          );
+        if (expandTimeout) clearTimeout(expandTimeout);
+        expandTimeout = setTimeout(() => {
+          isExpanding = false;
           tableStore.update(state => ({
             ...state,
-            テーブル: updatedSheet
+            テーブル: state.テーブル.map(row => 
+              row.map(cell => ({ ...cell, isAnimating: false }))
+            )
           }));
-          isExpanding = false;
         }, 300);
-      } else {
-        isExpanding = false;
       }
     }
   }
@@ -223,35 +223,109 @@
 
   // 列ヘッダーのラベルを生成
   function getColumnLabel(col: number): string {
-    return String.fromCharCode(65 + col);
+    let label = '';
+    let num = col;
+    
+    do {
+      const remainder = num % 26;
+      label = String.fromCharCode(65 + remainder) + label;
+      num = Math.floor(num / 26) - 1;
+    } while (num >= 0);
+    
+    return label;
   }
 
   // Intersection Observerを要素にアタッチするアクション
-  function observeLastElement(node: HTMLElement, isLast: boolean) {
-    if (observer && isLast) {
-      observer.observe(node);
+  function observeLastElement(element: HTMLElement) {
+    if (observer) {
+      observer.observe(element);
+      return {
+        destroy() {
+          observer.unobserve(element);
+        }
+      };
     }
-
-    return {
-      destroy() {
-        if (observer) {
-          observer.unobserve(node);
-        }
-      },
-      update(newIsLast: boolean) {
-        if (observer) {
-          if (newIsLast) {
-            observer.observe(node);
-          } else {
-            observer.unobserve(node);
-          }
-        }
-      }
-    };
   }
 </script>
 
 <style>
+  .grid-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+  }
+
+  .grid {
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+
+  .cell {
+    border: 1px solid #ccc;
+    padding: 4px 8px;
+    text-align: left;
+    position: relative;
+    background: white;
+  }
+
+  .grid-cell {
+    min-width: 100px;
+    height: 24px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .grid-cell.expanding {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: scale(0.9);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  input {
+    width: 100%;
+    height: 100%;
+    border: none;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    background: transparent;
+  }
+
+  input:focus {
+    outline: none;
+    background: #f0f8ff;
+  }
+
+  .row-header {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: #f5f5f5;
+    text-align: center;
+    min-width: 40px;
+  }
+
+  .col-header {
+    background: #f5f5f5;
+    text-align: center;
+    z-index: 2;
+  }
+
+  .header-row .row-header {
+    z-index: 3;
+  }
+
   .grid-container {
     position: relative;
     overflow: auto;
@@ -268,24 +342,6 @@
     height: max-content;
   }
   
-  .cell {
-    border: 1px solid #ccc;
-    padding: 4px 8px;
-    min-width: 80px;
-    height: 24px;
-    transition: all 0.2s;
-    cursor: pointer;
-    position: relative;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    background-color: white;
-  }
-
-  .grid-cell {
-    composes: cell;
-  }
-
   .cell:hover {
     background-color: #f5f5f5;
   }
@@ -306,20 +362,6 @@
     }
   }
   
-  input {
-    width: 100%;
-    height: 100%;
-    border: none;
-    padding: 2px;
-    box-sizing: border-box;
-    background: transparent;
-  }
-  
-  input:focus {
-    outline: 2px solid #4a90e2;
-    background: white;
-  }
-
   .cell-content {
     width: 100%;
     height: 100%;
@@ -329,27 +371,16 @@
     text-overflow: ellipsis;
   }
 
-  .header-cell {
+  .row-header {
     background-color: #f0f0f0;
     font-weight: bold;
     text-align: center;
     user-select: none;
     position: sticky;
-    z-index: 2;
-  }
-
-  .col-header {
-    composes: header-cell;
-    top: 0;
-    background-color: #f0f0f0;
-  }
-
-  .row-header {
-    composes: header-cell;
     left: 0;
+    z-index: 2;
     width: 40px;
     min-width: 40px;
-    background-color: #f0f0f0;
   }
 
   /* 左上のヘッダーセルの固定 */
@@ -390,7 +421,7 @@
   }
 </style>
 
-<div class="grid-container" data-testid="grid-container">
+<div class="grid-container" data-testid="grid-container" style="overflow: auto;">
   <table class="grid">
     <thead>
       <tr class="header-row">
@@ -398,9 +429,9 @@
         {#each indices as col}
           <th 
             class="col-header cell"
-            style="width: {TableEditor.getColumnWidth($tableStore.テーブル, col)}px;"
+            style="width: {TableEditor.getColumnWidth($tableStore.テーブル, col)}px; position: sticky; top: 0;"
             data-last-col={col === indices.length - 1}
-            use:observeLastElement={col === indices.length - 1}
+            use:observeLastElement
           >
             {getColumnLabel(col)}
             <GridResizer type="column" index={col} />
@@ -421,11 +452,12 @@
               class:expanding={isExpanding && (row === indices.length - 1 || col === indices.length - 1)}
               on:click={() => handleCellClick(row, col)}
               style="width: {TableEditor.getColumnWidth($tableStore.テーブル, col)}px; 
-                     height: {TableEditor.getRowHeight($tableStore.テーブル, row)}px;"
+                     height: {TableEditor.getRowHeight($tableStore.テーブル, row)}px;
+                     min-width: 100px;"
               data-testid="grid-cell-{row}-{col}"
               data-last-row={row === indices.length - 1}
               data-last-col={col === indices.length - 1}
-              use:observeLastElement={(row === indices.length - 1) || (col === indices.length - 1)}
+              use:observeLastElement
             >
               {#if editingCell?.row === row && editingCell?.col === col}
                 <input
@@ -433,12 +465,11 @@
                   bind:value={editingValue}
                   on:blur={handleInputBlur}
                   on:keydown={handleInputKeydown}
-                  data-testid="cell-input"
                 />
               {:else}
-                <span class="cell-content" data-testid="cell-content-{row}-{col}">
-                  {$tableStore.テーブル[row]?.[col]?.value ?? ''}
-                </span>
+                <div class="cell-content">
+                  {$tableStore.テーブル[row][col].value}
+                </div>
               {/if}
             </td>
           {/each}

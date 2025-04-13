@@ -1,7 +1,6 @@
 import type { Sheet } from '../../models/table/types';
 
 export class TableEditor {
-  static readonly GRID_SIZE = 20;
   static readonly DEFAULT_COL_WIDTH = 100;  // デフォルト列幅
   static readonly DEFAULT_ROW_HEIGHT = 24;  // デフォルト行高さ
   static readonly MIN_COL_WIDTH = 50;      // 最小列幅
@@ -61,16 +60,18 @@ export class TableEditor {
 
   /**
    * 空のシートを作成する
-   * @returns 1x1の空のシート
+   * @param rows 行数（デフォルト: 100）
+   * @param cols 列数（デフォルト: 100）
+   * @returns 指定サイズの空のシート
    */
-  static createEmptySheet(): Sheet {
-    return Array.from({ length: this.GRID_SIZE }, (_, row) =>
-      Array.from({ length: this.GRID_SIZE }, (_, col) => ({
+  static createEmptySheet(rows: number = 100, cols: number = 100): Sheet {
+    return Array.from({ length: rows }, (_, row) =>
+      Array.from({ length: cols }, (_, col) => ({
         value: '',
         width: this.DEFAULT_COL_WIDTH,
         height: this.DEFAULT_ROW_HEIGHT
       })))
-  };
+  }
 
   /**
    * 必要に応じてシートを拡張する
@@ -82,13 +83,9 @@ export class TableEditor {
     const lastRowIndex = sheet.length - 1;
     const lastColIndex = sheet[0].length - 1;
 
-    // 最終行・列のデータ存在チェック
-    const lastRowHasData = sheet[lastRowIndex].some(cell => cell.value.trim() !== '');
-    const lastColHasData = sheet.some(row => row[lastColIndex].value.trim() !== '');
-
     // 表示検知による拡張
-    const shouldExpandRow = options?.isLastRowVisible && lastRowHasData;
-    const shouldExpandCol = options?.isLastColumnVisible && lastColHasData;
+    const shouldExpandRow = options?.isLastRowVisible;
+    const shouldExpandCol = options?.isLastColumnVisible;
 
     if (!shouldExpandRow && !shouldExpandCol) {
       return sheet;
@@ -97,7 +94,7 @@ export class TableEditor {
     // 新しいシートを作成（ディープコピー）
     const newSheet = sheet.map(row => row.map(cell => ({ ...cell })));
 
-    // 最終行にデータがあり、表示されている場合、新しい行を追加
+    // 最終行が表示されている場合、新しい行を追加
     if (shouldExpandRow) {
       const newRow = Array(newSheet[0].length).fill(null).map(() => ({
         value: '',
@@ -108,7 +105,7 @@ export class TableEditor {
       newSheet.push(newRow);
     }
 
-    // 最終列にデータがあり、表示されている場合、各行に新しい列を追加
+    // 最終列が表示されている場合、各行に新しい列を追加
     if (shouldExpandCol) {
       newSheet.forEach(row => {
         row.push({

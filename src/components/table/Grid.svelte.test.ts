@@ -9,7 +9,7 @@ import { tableStore } from '../../models/state/store';
 import { TableEditor } from '../../logic/table/editor';
 import { UmlEditor } from '../../logic/uml/editor';
 import { tick } from 'svelte';
-import type { Sheet } from '../../models/table/types';
+import type { Sheet, Cell } from '../../models/table/types';
 
 // IntersectionObserverのモック
 class MockIntersectionObserver implements IntersectionObserver {
@@ -21,7 +21,20 @@ class MockIntersectionObserver implements IntersectionObserver {
     // コンストラクタの実装
   }
 
-  observe = vi.fn();
+  observe = vi.fn((target: Element) => {
+    // 監視開始時にコールバックを呼び出し
+    setTimeout(() => {
+      this.callback([{
+        isIntersecting: true,
+        target,
+        boundingClientRect: new DOMRect(),
+        intersectionRatio: 1,
+        intersectionRect: new DOMRect(),
+        rootBounds: null,
+        time: Date.now()
+      }], this);
+    }, 0);
+  });
   unobserve = vi.fn();
   disconnect = vi.fn();
   takeRecords = vi.fn(() => []);
@@ -58,7 +71,7 @@ describe('Grid.svelte', () => {
       await fireEvent.blur(input!);
       
       // 入力値が反映されていることを確認
-      const content = container.querySelector('[data-testid="cell-content-0-0"]');
+      const content = container.querySelector('.cell-content');
       expect(content?.textContent?.trim()).toBe('test');
     });
 
@@ -85,7 +98,7 @@ describe('Grid.svelte', () => {
     it('スクロール時にヘッダーが固定されたままであること', () => {
       const { container } = render(Grid);
       const colHeader = container.querySelector('.col-header') as HTMLElement;
-      expect(colHeader.style.top).toBe('0');
+      expect(colHeader.style.top).toBe('0px');
     });
   });
 
@@ -136,120 +149,137 @@ describe('Grid.svelte', () => {
   });
 
   describe('動的拡張機能', () => {
-    beforeEach(() => {
-      // IntersectionObserverのモック
-      global.IntersectionObserver = class IntersectionObserverMock implements IntersectionObserver {
-        readonly root: Element | null = null;
-        readonly rootMargin: string = '0px';
-        readonly thresholds: ReadonlyArray<number> = [0];
-        
-        constructor(private callback: IntersectionObserverCallback) {
-          setTimeout(() => {
-            callback([{
-              isIntersecting: true,
-              target: document.createElement('div'),
-              boundingClientRect: new DOMRect(),
-              intersectionRatio: 1,
-              intersectionRect: new DOMRect(),
-              rootBounds: null,
-              time: Date.now()
-            }], this);
-          }, 0);
-        }
-        
-        observe() {}
-        unobserve() {}
-        disconnect() {}
-        takeRecords(): IntersectionObserverEntry[] { return []; }
-      };
-    });
-
-    test('最終行が表示され、データが入力されると拡張される', async () => {
+    test('最終行が表示され、データがある場合に無制限に拡張される', async () => {
       const { container } = render(Grid);
       
-      // 最終行のセルを取得
-      const lastRowCell = container.querySelector('[data-testid="grid-cell-19-0"]');
-      expect(lastRowCell).toBeTruthy();
+      // 100回の拡張をシミュレート
+      for (let i = 0; i < 100; i++) {
+        const state = get(tableStore);
+        const lastRowIndex = state.テーブル.length - 1;
+        const lastRowCell = container.querySelector(`[data-testid="grid-cell-${lastRowIndex}-0"]`);
+        expect(lastRowCell).toBeTruthy();
+        
+        await fireEvent.click(lastRowCell!);
+        const input = container.querySelector('input');
+        expect(input).toBeTruthy();
+        await fireEvent.input(input!, { target: { value: `test${i}` } });
+        await fireEvent.blur(input!);
 
-      // 最終行のセルをクリック
+        await tick();
+      }
+
+      // グリッドが正しく拡張されたことを確認
+      const state = get(tableStore);
+      expect(state.テーブル.length).toBeGreaterThan(100);
+      expect(state.テーブル[100].some((cell: { value: string }) => cell.value === 'test99')).toBe(true);
+    });
+
+    test('最終列が表示され、データがある場合に無制限に拡張される', async () => {
+      const { container } = render(Grid);
+      
+      // 100回の拡張をシミュレート
+      for (let i = 0; i < 100; i++) {
+        const state = get(tableStore);
+        const lastColIndex = state.テーブル[0].length - 1;
+        const lastColCell = container.querySelector(`[data-testid="grid-cell-0-${lastColIndex}"]`);
+        expect(lastColCell).toBeTruthy();
+        
+        await fireEvent.click(lastColCell!);
+        const input = container.querySelector('input');
+        expect(input).toBeTruthy();
+        await fireEvent.input(input!, { target: { value: `test${i}` } });
+        await fireEvent.blur(input!);
+
+        await tick();
+      }
+
+      // グリッドが正しく拡張されたことを確認
+      const state = get(tableStore);
+      expect(state.テーブル[0].length).toBeGreaterThan(100);
+      expect(state.テーブル[0][100].value === 'test99').toBe(true);
+    });
+
+    test('大量データ時のパフォーマンス', async () => {
+      const { container } = render(Grid);
+      const startTime = performance.now();
+      
+      // 1000セルにデータを入力
+      for (let i = 0; i < 50; i++) {
+        for (let j = 0; j < 20; j++) {
+          const cell = container.querySelector(`[data-testid="grid-cell-${i}-${j}"]`);
+          expect(cell).toBeTruthy();
+          
+          await fireEvent.click(cell!);
+          const input = container.querySelector('input');
+          expect(input).toBeTruthy();
+          await fireEvent.input(input!, { target: { value: `test${i}-${j}` } });
+          await fireEvent.blur(input!);
+
+          await tick();
+        }
+      }
+
+      const endTime = performance.now();
+      const executionTime = endTime - startTime;
+      
+      // 1000セルの入力が10秒以内に完了することを確認
+      expect(executionTime).toBeLessThan(10000);
+      
+      // メモリ使用量を確認（Node.jsの場合）
+      if (typeof process !== 'undefined') {
+        const memoryUsage = process.memoryUsage();
+        // ヒープメモリが1GB未満であることを確認
+        expect(memoryUsage.heapUsed).toBeLessThan(1024 * 1024 * 1024);
+      }
+    });
+
+    test('アニメーション状態が正しく管理される', async () => {
+      const { container } = render(Grid);
+      
+      // 最終行のセルにデータを入力
+      const state = get(tableStore);
+      const lastRowIndex = state.テーブル.length - 1;
+      const lastRowCell = container.querySelector(`[data-testid="grid-cell-${lastRowIndex}-0"]`);
+      expect(lastRowCell).toBeTruthy();
       await fireEvent.click(lastRowCell!);
       
-      // データを入力
       const input = container.querySelector('input');
       expect(input).toBeTruthy();
       await fireEvent.input(input!, { target: { value: 'test' } });
       await fireEvent.blur(input!);
 
-      // グリッドサイズが拡張されたことを確認
       await tick();
-      const cells = container.querySelectorAll('.grid-cell');
-      expect(cells.length).toBe(20 * 20); // グリッドサイズは20x20のまま
+      
+      // アニメーション状態を確認
+      const updatedState = get(tableStore);
+      const newRow = updatedState.テーブル[updatedState.テーブル.length - 1];
+      expect(newRow.every((cell: Cell) => cell.isAnimating)).toBe(true);
+
+      // アニメーション終了を待機
+      await new Promise(resolve => setTimeout(resolve, 300));
+      await tick();
+
+      // アニメーション状態がリセットされたことを確認
+      const finalState = get(tableStore);
+      const updatedRow = finalState.テーブル[finalState.テーブル.length - 1];
+      expect(updatedRow.every((cell: Cell) => !cell.isAnimating)).toBe(true);
     });
 
-    test('最終列が表示され、データが入力されると拡張される', async () => {
+    test('空の最終行・列は拡張されない', async () => {
       const { container } = render(Grid);
       
-      // 最終列のセルを取得
+      // 空の最終行・列を表示
+      const lastRowCell = container.querySelector('[data-testid="grid-cell-19-0"]');
       const lastColCell = container.querySelector('[data-testid="grid-cell-0-19"]');
+      expect(lastRowCell).toBeTruthy();
       expect(lastColCell).toBeTruthy();
 
-      // 最終列のセルをクリック
-      await fireEvent.click(lastColCell!);
-      
-      // 入力フィールドにデータを入力
-      const input = container.querySelector('input');
-      expect(input).toBeTruthy();
-      await fireEvent.input(input!, { target: { value: 'test' } });
-      await fireEvent.blur(input!);
-
-      // グリッドサイズが拡張されたことを確認
       await tick();
-      const cells = container.querySelectorAll('.grid-cell');
-      expect(cells.length).toBe(20 * 20); // グリッドサイズは20x20のまま
-    });
-
-    test('最終行・列が空の場合は拡張されない', async () => {
-      const { container } = render(Grid);
       
-      // 最終行のセルを取得
-      const lastRowCell = container.querySelector('[data-testid="grid-cell-19-0"]');
-      expect(lastRowCell).toBeTruthy();
-
-      // 最終行のセルをクリック
-      await fireEvent.click(lastRowCell!);
-      
-      // 空文字を入力
-      const input = container.querySelector('input');
-      expect(input).toBeTruthy();
-      await fireEvent.input(input!, { target: { value: '' } });
-      await fireEvent.blur(input!);
-
-      // グリッドサイズが変わっていないことを確認
-      await tick();
-      const cells = container.querySelectorAll('.grid-cell');
-      expect(cells.length).toBe(20 * 20);
-    });
-
-    test('グリッドサイズの上限を超えて拡張されない', async () => {
-      const { container } = render(Grid);
-      
-      // 最終行のセルを取得
-      const lastRowCell = container.querySelector('[data-testid="grid-cell-19-0"]');
-      expect(lastRowCell).toBeTruthy();
-
-      // 最終行のセルをクリック
-      await fireEvent.click(lastRowCell!);
-      
-      // データを入力
-      const input = container.querySelector('input');
-      expect(input).toBeTruthy();
-      await fireEvent.input(input!, { target: { value: 'test' } });
-      await fireEvent.blur(input!);
-
-      // グリッドサイズが変わっていないことを確認（上限に達しているため）
-      await tick();
-      const cells = container.querySelectorAll('.grid-cell');
-      expect(cells.length).toBe(20 * 20);
+      // グリッドサイズが変更されていないことを確認
+      const state = get(tableStore);
+      expect(state.テーブル.length).toBe(20);
+      expect(state.テーブル[0].length).toBe(20);
     });
   });
 }); 
