@@ -23,17 +23,23 @@ export class UmlViewer {
    * @returns Promise<void>
    */
   static async render(containerId: string, dsl: string): Promise<void> {
+    const container = document.getElementById(containerId);
+    if (!container) {
+      throw new Error(`Container ${containerId} not found`);
+    }
+
     if (!dsl.trim()) {
-      document.getElementById(containerId)!.innerHTML = '';
+      container.innerHTML = '';
       return;
     }
 
     try {
       const { svg } = await mermaid.render(`mermaid-${Date.now()}`, dsl);
-      document.getElementById(containerId)!.innerHTML = svg;
+      container.innerHTML = svg;
     } catch (error) {
       console.error('Mermaid rendering error:', error);
-      document.getElementById(containerId)!.innerHTML = `<div class="error">UML描画エラー</div>`;
+      container.innerHTML = '';  // コンテナを空にする
+      throw error;
     }
   }
 
@@ -43,15 +49,23 @@ export class UmlViewer {
    * @param dsl レンダリングするDSL
    * @returns Promise<void>
    */
-  static debounceRender(containerId: string, dsl: string): void {
-    if (this.debounceTimer) {
-      clearTimeout(this.debounceTimer);
-    }
+  static debounceRender(containerId: string, dsl: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (this.debounceTimer) {
+        clearTimeout(this.debounceTimer);
+      }
 
-    this.debounceTimer = setTimeout(() => {
-      this.render(containerId, dsl);
-      this.debounceTimer = null;
-    }, this.DEBOUNCE_DELAY);
+      this.debounceTimer = setTimeout(async () => {
+        try {
+          await this.render(containerId, dsl);
+          this.debounceTimer = null;
+          resolve();
+        } catch (error) {
+          this.debounceTimer = null;
+          reject(error);
+        }
+      }, this.DEBOUNCE_DELAY);
+    });
   }
 
   /**

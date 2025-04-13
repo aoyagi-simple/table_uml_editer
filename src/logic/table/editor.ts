@@ -1,11 +1,11 @@
 import type { Sheet } from '../../models/table/types';
 
 export class TableEditor {
-  private static readonly GRID_SIZE = 20;
-  private static readonly DEFAULT_COL_WIDTH = 100;  // デフォルト列幅
-  private static readonly DEFAULT_ROW_HEIGHT = 24;  // デフォルト行高さ
-  private static readonly MIN_COL_WIDTH = 50;      // 最小列幅
-  private static readonly MAX_COL_WIDTH = 300;     // 最大列幅
+  static readonly GRID_SIZE = 20;
+  static readonly DEFAULT_COL_WIDTH = 100;  // デフォルト列幅
+  static readonly DEFAULT_ROW_HEIGHT = 24;  // デフォルト行高さ
+  static readonly MIN_COL_WIDTH = 50;      // 最小列幅
+  static readonly MAX_COL_WIDTH = 300;     // 最大列幅
   private static readonly MIN_ROW_HEIGHT = 20;     // 最小行高さ
   private static readonly MAX_ROW_HEIGHT = 100;    // 最大行高さ
 
@@ -74,25 +74,50 @@ export class TableEditor {
    * @returns 拡張されたシート（必要な場合）
    */
   static expandIfNeeded(sheet: Sheet): Sheet {
-    const lastRowHasData = sheet[sheet.length - 1].some(cell => cell.value !== '');
-    const lastColHasData = sheet.some(row => row[row.length - 1].value !== '');
+    const lastRowIndex = sheet.length - 1;
+    const lastColIndex = sheet[0].length - 1;
+    
+    // 最終行・列のデータ存在チェック
+    const lastRowHasData = sheet[lastRowIndex].some(cell => cell.value.trim() !== '');
+    const lastColHasData = sheet.some(row => row[lastColIndex].value.trim() !== '');
 
     if (!lastRowHasData && !lastColHasData) {
       return sheet;
     }
 
-    // 新しいシートを作成
-    const newSheet = sheet.map(row => [...row]);
+    // 新しいシートを作成（ディープコピー）
+    const newSheet = sheet.map(row => row.map(cell => ({ ...cell })));
 
     // 最終行にデータがある場合、新しい行を追加
-    if (lastRowHasData) {
-      newSheet.push(Array(sheet[0].length).fill(null).map(() => ({ value: '' })));
+    if (lastRowHasData && lastRowIndex < this.GRID_SIZE - 1) {
+      const newRow = Array(sheet[0].length).fill(null).map(() => ({
+        value: '',
+        width: this.DEFAULT_COL_WIDTH,
+        height: this.DEFAULT_ROW_HEIGHT
+      }));
+      newSheet.push(newRow);
     }
 
     // 最終列にデータがある場合、各行に新しい列を追加
-    if (lastColHasData) {
-      newSheet.forEach(row => row.push({ value: '' }));
+    if (lastColHasData && lastColIndex < this.GRID_SIZE - 1) {
+      newSheet.forEach(row => {
+        row.push({
+          value: '',
+          width: this.DEFAULT_COL_WIDTH,
+          height: this.DEFAULT_ROW_HEIGHT
+        });
+      });
     }
+
+    // グリッドサイズの制限を確認
+    if (newSheet.length > this.GRID_SIZE) {
+      newSheet.length = this.GRID_SIZE;
+    }
+    newSheet.forEach(row => {
+      if (row.length > this.GRID_SIZE) {
+        row.length = this.GRID_SIZE;
+      }
+    });
 
     return newSheet;
   }
@@ -153,10 +178,9 @@ export class TableEditor {
     }
 
     const clampedWidth = Math.min(Math.max(width, this.MIN_COL_WIDTH), this.MAX_COL_WIDTH);
-    const newSheet = sheet.map(row => row.map((cell, index) => 
-      index === col ? { ...cell, width: clampedWidth } : { ...cell }
+    return sheet.map(row => row.map((cell, index) => 
+      index === col ? { ...cell, width: clampedWidth } : cell
     ));
-    return newSheet;
   }
 
   /**

@@ -109,31 +109,34 @@
     margin: 0;
     border: none;
     background: transparent;
+    cursor: col-resize;
   }
 
-  .resize-handle:hover {
+  .resize-handle:hover,
+  .resize-handle:focus {
     opacity: 1;
   }
 
   .resize-handle.column {
     top: 0;
     bottom: 0;
-    width: 4px;
+    width: 8px;
+    right: -4px;
     cursor: col-resize;
-    right: -2px;
   }
 
   .resize-handle.row {
     left: 0;
     right: 0;
-    height: 4px;
+    height: 8px;
+    bottom: -4px;
     cursor: row-resize;
-    bottom: -2px;
   }
 
   .handle-line {
     position: absolute;
     background: #4a90e2;
+    transition: background-color 0.2s;
   }
 
   .column .handle-line {
@@ -148,5 +151,10 @@
     width: 100%;
     top: 50%;
     transform: translateY(-50%);
+  }
+
+  .resize-handle:hover .handle-line,
+  .resize-handle:focus .handle-line {
+    background: #2171d3;
   }
 </style> 

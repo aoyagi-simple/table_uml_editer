@@ -21,6 +21,7 @@ describe('UmlViewer', () => {
     vi.useFakeTimers();
     // mermaidのモックをリセット
     vi.mocked(mermaid.render).mockReset();
+    vi.mocked(mermaid.render).mockResolvedValue({ svg: '<svg>test</svg>', diagramType: 'flowchart' });
   });
 
   afterEach(() => {
@@ -37,10 +38,11 @@ describe('UmlViewer', () => {
       vi.mocked(mermaid.render).mockResolvedValue({ svg, diagramType: 'flowchart' });
 
       // 描画を開始
-      UmlViewer.debounceRender('test-container', dsl);
+      const renderPromise = UmlViewer.debounceRender('test-container', dsl);
       
       // タイマーを進める
       await vi.advanceTimersByTimeAsync(1000);
+      await renderPromise;
       
       // 描画が呼ばれたことを確認
       expect(mermaid.render).toHaveBeenCalledTimes(1);
@@ -59,12 +61,18 @@ describe('UmlViewer', () => {
       const svg = '<svg>test</svg>';
       vi.mocked(mermaid.render).mockResolvedValue({ svg, diagramType: 'flowchart' });
 
-      // 複数回の更新
+      // 最初の呼び出し
       UmlViewer.debounceRender('test-container', 'first');
-      await vi.advanceTimersByTimeAsync(500);
+      
+      // 500ms進める
+      await vi.advanceTimersByTime(500);
+      
+      // 2回目の呼び出し
       UmlViewer.debounceRender('test-container', dsl);
-      await vi.advanceTimersByTimeAsync(1000);
-
+      
+      // 残りの時間を進める
+      await vi.advanceTimersByTime(1000);
+      
       // 最後の更新のみが反映されることを確認
       expect(mermaid.render).toHaveBeenCalledTimes(1);
       expect(mermaid.render).toHaveBeenCalledWith(expect.any(String), dsl);
@@ -74,11 +82,18 @@ describe('UmlViewer', () => {
   describe('異常系', () => {
     it('不正なDSLでエラーが表示されること', async () => {
       const invalidDsl = 'invalid';
-      vi.mocked(mermaid.render).mockRejectedValue(new Error('Invalid syntax'));
+      const error = new Error('Invalid syntax');
+      vi.mocked(mermaid.render).mockRejectedValue(error);
 
-      await UmlViewer.render('test-container', invalidDsl);
+      // エラーがスローされることを確認
+      await expect(UmlViewer.render('test-container', invalidDsl)).rejects.toThrow(error);
 
-      expect(document.getElementById('test-container')?.innerHTML).toBe('<div class="error">UML描画エラー</div>');
+      // コンテナが空になることを確認
+      expect(document.getElementById('test-container')?.innerHTML).toBe('');
+    });
+
+    it('存在しないコンテナIDでエラーがスローされること', async () => {
+      await expect(UmlViewer.render('non-existent', 'graph TD;\nA-->B;')).rejects.toThrow('Container non-existent not found');
     });
   });
 }); 
