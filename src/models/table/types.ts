@@ -2,6 +2,7 @@ export type Cell = {
   value: string;
   width?: number;   // 列幅（ピクセル）
   height?: number;  // 行高さ（ピクセル）
+  isAnimating?: boolean;
 };
 
 export type Sheet = Cell[][];
@@ -118,13 +119,13 @@ export class TableModel {
   }
 
   private validatePosition(row: number, col: number): void {
-    if (row < 0 || row >= TableModel.GRID_SIZE || col < 0 || col >= TableModel.GRID_SIZE) {
+    if (row < 0 || col < 0 ) {
       throw new Error(`位置が範囲外です: (${row}, ${col})`);
     }
   }
 
   private validateIndex(index: number): void {
-    if (index < 0 || index >= TableModel.GRID_SIZE) {
+    if (index < 0 ) {
       throw new Error('インデックスが範囲外です');
     }
   }

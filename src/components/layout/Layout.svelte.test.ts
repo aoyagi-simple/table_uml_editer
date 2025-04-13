@@ -1,16 +1,31 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, fireEvent } from '@testing-library/svelte';
 import { get } from 'svelte/store';
 import Layout from './Layout.svelte';
 import { tableStore } from '../../models/state/store';
+import { TableEditor } from '../../logic/table/editor';
+
+// IntersectionObserverのモック
+const mockIntersectionObserver = vi.fn();
+mockIntersectionObserver.mockImplementation((callback) => ({
+  observe: vi.fn(),
+  unobserve: vi.fn(),
+  disconnect: vi.fn()
+}));
+
+vi.stubGlobal('IntersectionObserver', mockIntersectionObserver);
 
 describe('Layout', () => {
   beforeEach(() => {
-    // ストアを初期状態にリセット
-    tableStore.reset();
+    // テストごとにストアをリセット
+    tableStore.set({
+      テーブル: TableEditor.createEmptySheet(),
+      uml: { dsl: '', mode: 'editor-viewer' },
+      splitRatio: 50
+    });
   });
 
   describe('正常系', () => {

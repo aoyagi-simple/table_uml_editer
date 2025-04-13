@@ -52,10 +52,6 @@ describe('TableEditor', () => {
       // 負のインデックス
       expect(() => TableEditor.updateCell(sheet, -1, 0, 'test')).toThrow('セルのインデックスが範囲外です');
       expect(() => TableEditor.updateCell(sheet, 0, -1, 'test')).toThrow('セルのインデックスが範囲外です');
-      
-      // 範囲外のインデックス
-      expect(() => TableEditor.updateCell(sheet, 20, 0, 'test')).toThrow('セルのインデックスが範囲外です');
-      expect(() => TableEditor.updateCell(sheet, 0, 20, 'test')).toThrow('セルのインデックスが範囲外です');
     });
 
     it('範囲外のインデックスでエラーが発生すること（取得時）', () => {
@@ -64,10 +60,6 @@ describe('TableEditor', () => {
       // 負のインデックス
       expect(() => TableEditor.getCellValue(sheet, -1, 0)).toThrow('セルのインデックスが範囲外です');
       expect(() => TableEditor.getCellValue(sheet, 0, -1)).toThrow('セルのインデックスが範囲外です');
-      
-      // 範囲外のインデックス
-      expect(() => TableEditor.getCellValue(sheet, 20, 0)).toThrow('セルのインデックスが範囲外です');
-      expect(() => TableEditor.getCellValue(sheet, 0, 20)).toThrow('セルのインデックスが範囲外です');
     });
   });
 
@@ -115,15 +107,11 @@ describe('TableEditor', () => {
       
       // 列幅
       expect(() => TableEditor.getColumnWidth(sheet, -1)).toThrow('インデックスが範囲外です');
-      expect(() => TableEditor.getColumnWidth(sheet, 20)).toThrow('インデックスが範囲外です');
       expect(() => TableEditor.setColumnWidth(sheet, -1, 100)).toThrow('インデックスが範囲外です');
-      expect(() => TableEditor.setColumnWidth(sheet, 20, 100)).toThrow('インデックスが範囲外です');
       
       // 行高さ
       expect(() => TableEditor.getRowHeight(sheet, -1)).toThrow('インデックスが範囲外です');
-      expect(() => TableEditor.getRowHeight(sheet, 20)).toThrow('インデックスが範囲外です');
       expect(() => TableEditor.setRowHeight(sheet, -1, 30)).toThrow('インデックスが範囲外です');
-      expect(() => TableEditor.setRowHeight(sheet, 20, 30)).toThrow('インデックスが範囲外です');
     });
   });
 }); 

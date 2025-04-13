@@ -20,7 +20,9 @@ function createStore() {
       update(state => {
         const newState = fn(state);
         // UMLモードのバリデーション
-        if (newState.uml.mode !== 'editor-viewer' && newState.uml.mode !== 'viewer-only') {
+        if (newState?.uml?.mode !== undefined && 
+            newState.uml.mode !== 'editor-viewer' && 
+            newState.uml.mode !== 'viewer-only') {
           throw new Error('不正なUMLモードです');
         }
         return newState;

@@ -9,30 +9,107 @@
   import type { Sheet } from '../../models/table/types';
   import { TableEditor } from '../../logic/table/editor';
   import { tableStore } from '../../models/state/store';
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import GridResizer from './GridResizer.svelte';
   import { fade } from 'svelte/transition';
 
-  // 行と列のサイズ
-  const GRID_SIZE = 20;
+  let gridSize = 0;
+  let observer: IntersectionObserver;
+  let isLastRowVisible = false;
+  let isLastColVisible = false;
+  let expandCheckTimeout: NodeJS.Timeout | undefined;
+  let expandTimeout: NodeJS.Timeout | undefined;
 
-  // 行と列のインデックス配列
-  const indices = Array.from({ length: GRID_SIZE }, (_, i) => i);
+  // 行と列のインデックス配列を動的に生成
+  $: {
+    const currentSheet = $tableStore.テーブル;
+    gridSize = Math.max(currentSheet.length, currentSheet[0]?.length || 0);
+  }
+
+  $: indices = Array.from({ length: gridSize }, (_, i) => i);
 
   let editingCell: { row: number; col: number } | null = null;
   let editingValue = '';
   let isExpanding = false;
-  let expandTimeout: NodeJS.Timeout;
 
   // 文字列の幅を計算するためのキャンバス
   let measureCanvas: HTMLCanvasElement;
   
   onMount(() => {
     measureCanvas = document.createElement('canvas');
+    setupIntersectionObserver();
     return () => {
-      clearTimeout(expandTimeout);
+      if (expandTimeout) clearTimeout(expandTimeout);
+      if (expandCheckTimeout) clearTimeout(expandCheckTimeout);
+      if (observer) {
+        observer.disconnect();
+      }
     };
   });
+
+  function setupIntersectionObserver() {
+    observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        const target = entry.target as HTMLElement;
+        if (target.dataset.lastRow !== undefined) {
+          isLastRowVisible = entry.isIntersecting;
+        }
+        if (target.dataset.lastCol !== undefined) {
+          isLastColVisible = entry.isIntersecting;
+        }
+
+        // 可視性が変更された時に拡張チェックを実行
+        clearTimeout(expandCheckTimeout);
+        expandCheckTimeout = setTimeout(checkAndExpandGrid, 100);
+      });
+    }, {
+      root: null,
+      rootMargin: '20px',
+      threshold: 0.1
+    });
+  }
+
+  function checkAndExpandGrid() {
+    const currentSheet = $tableStore.テーブル;
+    const lastRowIndex = currentSheet.length - 1;
+    const lastColIndex = currentSheet[0].length - 1;
+
+    // 最終行・列のデータ存在チェック
+    const lastRowHasData = currentSheet[lastRowIndex]?.some(cell => cell.value.trim() !== '');
+    const lastColHasData = currentSheet.some(row => row[lastColIndex]?.value.trim() !== '');
+
+    if ((isLastRowVisible && lastRowHasData) || (isLastColVisible && lastColHasData)) {
+      isExpanding = true;
+      const expandedSheet = TableEditor.expandIfNeeded(currentSheet, {
+        isLastRowVisible,
+        isLastColumnVisible: isLastColVisible
+      });
+      
+      if (expandedSheet.length > currentSheet.length || expandedSheet[0].length > currentSheet[0].length) {
+        tableStore.update(state => ({
+          ...state,
+          テーブル: expandedSheet
+        }));
+        
+        // グリッドサイズを更新
+        gridSize = Math.max(expandedSheet.length, expandedSheet[0].length);
+
+        // アニメーション状態をリセット
+        setTimeout(() => {
+          const updatedSheet = expandedSheet.map(row => 
+            row.map(cell => ({ ...cell, isAnimating: false }))
+          );
+          tableStore.update(state => ({
+            ...state,
+            テーブル: updatedSheet
+          }));
+          isExpanding = false;
+        }, 300);
+      } else {
+        isExpanding = false;
+      }
+    }
+  }
 
   // 文字列の幅を計算
   function measureTextWidth(text: string): number {
@@ -78,22 +155,21 @@
     if (newWidth > currentWidth) {
       newSheet[0][col].width = Math.min(newWidth, TableEditor.MAX_COL_WIDTH);
     }
-    
-    // 最終行または最終列の入力を検知
-    const isLastRow = row === GRID_SIZE - 1;
-    const isLastCol = col === GRID_SIZE - 1;
-    
-    if ((isLastRow || isLastCol) && value.trim() !== '') {
-      isExpanding = true;
-      clearTimeout(expandTimeout);
-      expandTimeout = setTimeout(() => {
-        const expandedSheet = TableEditor.expandIfNeeded(newSheet);
-        tableStore.update(state => ({
-          ...state,
-          テーブル: expandedSheet
-        }));
-        isExpanding = false;
-      }, 100);
+
+    // 値が更新された後に拡張チェックを実行
+    if (value.trim() !== '') {
+      const expandedSheet = TableEditor.expandIfNeeded(newSheet);
+      if (expandedSheet !== newSheet) {
+        isExpanding = true;
+        if (expandTimeout) clearTimeout(expandTimeout);
+        expandTimeout = setTimeout(() => {
+          isExpanding = false;
+        }, 300);
+      }
+      tableStore.update(state => ({
+        ...state,
+        テーブル: expandedSheet
+      }));
     } else {
       tableStore.update(state => ({
         ...state,
@@ -131,12 +207,12 @@
       // 次のセルに移動
       if (event.key === 'Tab') {
         const nextCol = editingCell.col + (event.shiftKey ? -1 : 1);
-        if (nextCol >= 0 && nextCol < GRID_SIZE) {
+        if (nextCol >= 0) {
           handleCellClick(editingCell.row, nextCol);
         }
       } else if (event.key === 'Enter') {
         const nextRow = editingCell.row + (event.shiftKey ? -1 : 1);
-        if (nextRow >= 0 && nextRow < GRID_SIZE) {
+        if (nextRow >= 0) {
           handleCellClick(nextRow, editingCell.col);
         }
       }
@@ -149,26 +225,53 @@
   function getColumnLabel(col: number): string {
     return String.fromCharCode(65 + col);
   }
+
+  // Intersection Observerを要素にアタッチするアクション
+  function observeLastElement(node: HTMLElement, isLast: boolean) {
+    if (observer && isLast) {
+      observer.observe(node);
+    }
+
+    return {
+      destroy() {
+        if (observer) {
+          observer.unobserve(node);
+        }
+      },
+      update(newIsLast: boolean) {
+        if (observer) {
+          if (newIsLast) {
+            observer.observe(node);
+          } else {
+            observer.unobserve(node);
+          }
+        }
+      }
+    };
+  }
 </script>
 
 <style>
   .grid-container {
     position: relative;
     overflow: auto;
-    max-height: 100%;
+    max-height: 100vh;
     max-width: 100%;
+    height: 100%;
+    border: 1px solid #ccc;
   }
   
   .grid {
     border-collapse: collapse;
     table-layout: fixed;
     width: max-content;
+    height: max-content;
   }
   
   .cell {
     border: 1px solid #ccc;
     padding: 4px 8px;
-    min-width: 100px;
+    min-width: 80px;
     height: 24px;
     transition: all 0.2s;
     cursor: pointer;
@@ -176,6 +279,7 @@
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
+    background-color: white;
   }
 
   .grid-cell {
@@ -188,11 +292,18 @@
 
   .cell.expanding {
     animation: fadeIn 0.3s ease-in-out;
+    background-color: #f0f8ff;
   }
 
   @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from { 
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to { 
+      opacity: 1;
+      transform: scale(1);
+    }
   }
   
   input {
@@ -224,12 +335,13 @@
     text-align: center;
     user-select: none;
     position: sticky;
-    z-index: 1;
+    z-index: 2;
   }
 
   .col-header {
     composes: header-cell;
     top: 0;
+    background-color: #f0f0f0;
   }
 
   .row-header {
@@ -237,6 +349,16 @@
     left: 0;
     width: 40px;
     min-width: 40px;
+    background-color: #f0f0f0;
+  }
+
+  /* 左上のヘッダーセルの固定 */
+  .row-header.cell:first-child {
+    position: sticky;
+    left: 0;
+    top: 0;
+    z-index: 3;
+    background-color: #f0f0f0;
   }
 
   .header-row {
@@ -277,6 +399,8 @@
           <th 
             class="col-header cell"
             style="width: {TableEditor.getColumnWidth($tableStore.テーブル, col)}px;"
+            data-last-col={col === indices.length - 1}
+            use:observeLastElement={col === indices.length - 1}
           >
             {getColumnLabel(col)}
             <GridResizer type="column" index={col} />
@@ -294,11 +418,14 @@
           {#each indices as col}
             <td 
               class="grid-cell cell" 
-              class:expanding={isExpanding && (row === GRID_SIZE - 1 || col === GRID_SIZE - 1)}
+              class:expanding={isExpanding && (row === indices.length - 1 || col === indices.length - 1)}
               on:click={() => handleCellClick(row, col)}
               style="width: {TableEditor.getColumnWidth($tableStore.テーブル, col)}px; 
                      height: {TableEditor.getRowHeight($tableStore.テーブル, row)}px;"
               data-testid="grid-cell-{row}-{col}"
+              data-last-row={row === indices.length - 1}
+              data-last-col={col === indices.length - 1}
+              use:observeLastElement={(row === indices.length - 1) || (col === indices.length - 1)}
             >
               {#if editingCell?.row === row && editingCell?.col === col}
                 <input
@@ -310,7 +437,7 @@
                 />
               {:else}
                 <span class="cell-content" data-testid="cell-content-{row}-{col}">
-                  {$tableStore.テーブル[row][col].value}
+                  {$tableStore.テーブル[row]?.[col]?.value ?? ''}
                 </span>
               {/if}
             </td>
